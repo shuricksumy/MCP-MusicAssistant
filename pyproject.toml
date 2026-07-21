@@ -1,0 +1,32 @@
+[project]
+name = "music-assistant-mcp"
+version = "0.1.0"
+description = "MCP server for Music Assistant with high-level, LLM-friendly tools"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "mcp[cli]>=1.2.0",
+    "music-assistant-client>=1.0.0",
+    "music-assistant-models>=1.0.0",
+    "uvicorn>=0.30.0",
+    "python-dotenv>=1.0.0",
+]
+
+[project.scripts]
+music-assistant-mcp = "music_assistant_mcp.server:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/music_assistant_mcp"]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.24.0",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
