@@ -55,10 +55,15 @@ server had to be bridged to get there.
 ## Setup
 
 ```bash
-cp .env.example .env   # fill in MA_SERVER_URL, MCP_BEARER_TOKEN, etc.
+cp .env.example .env   # fill in MA_SERVER_URL, MCP_BEARER_TOKEN, DEFAULT_PLAYER_NAME, etc.
 uv sync                # or: pip install -e ".[dev]"
 uv run music-assistant-mcp
 ```
+
+`DEFAULT_PLAYER_NAME` isn't optional in practice - leave it unset and any tool call that
+doesn't explicitly name a player fails with `No default player configured and none
+could be resolved` (confirmed live). Set it to a name from `list_players`' output (e.g.
+`"Living Room"`), not a player id.
 
 The server listens on `MCP_HOST:MCP_PORT` (default `0.0.0.0:8005`) and exposes the MCP
 endpoint at `/mcp`, requiring `Authorization: Bearer <MCP_BEARER_TOKEN>`.
@@ -125,13 +130,24 @@ stdio pipes directly instead of talking to it over the network:
       "env": {
         "MA_SERVER_URL": "http://<MA_SERVER_IP>:8095",
         "MA_TOKEN": "<your-ma-token>",
-        "MCP_TRANSPORT": "stdio"
+        "MCP_TRANSPORT": "stdio",
+        "DEFAULT_PLAYER_NAME": "<your-default-player-name>",
+        "SOURCE_PRIORITY": "tidal,spotify,apple_music"
       },
       "transportType": "stdio"
     }
   }
 }
 ```
+
+`DEFAULT_PLAYER_NAME` matters here more than it does for n8n: without it, every `play`/
+`control`/`volume`/etc. call that doesn't explicitly name a player fails with `No
+default player configured and none could be resolved` (confirmed live) - the whole
+point of the tools resolving players themselves falls apart if there's nothing to fall
+back to. Set it to one of the names `list_players` returns (e.g. `"Living Room"`, not a
+player id). `SOURCE_PRIORITY` is optional but worth setting explicitly since its
+built-in default (`tidal,spotify,apple_music`) may not match the providers you actually
+have configured.
 
 Confirmed working locally: piping a real `initialize` request into
 `MCP_TRANSPORT=stdio uv run music-assistant-mcp` returns a clean JSON-RPC response on
@@ -146,6 +162,7 @@ docker run -d --name music-assistant-mcp -p 8005:8005 \
   -e MA_SERVER_URL=http://192.168.1.50:8095 \
   -e MA_TOKEN=<your-ma-token> \
   -e MCP_BEARER_TOKEN=<your-mcp-bearer-token> \
+  -e DEFAULT_PLAYER_NAME=<your-default-player-name> \
   music-assistant-mcp
 ```
 
