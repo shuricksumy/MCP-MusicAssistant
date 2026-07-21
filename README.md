@@ -42,7 +42,7 @@ endpoint at `/mcp`, requiring `Authorization: Bearer <MCP_BEARER_TOKEN>`.
 
 | Variable | Purpose |
 |---|---|
-| `MA_SERVER_URL` | Music Assistant server, e.g. `http://192.168.111.111:8095` |
+| `MA_SERVER_URL` | Music Assistant server, e.g. `http://192.168.1.50:8095` |
 | `MA_TOKEN` | Music Assistant auth token (required on schema ≥ 28 servers) |
 | `MCP_HOST` / `MCP_PORT` | This server's own bind address |
 | `MCP_BEARER_TOKEN` | Shared secret clients must send as `Authorization: Bearer <token>` |
@@ -73,7 +73,7 @@ server entry (Claude Desktop, Cursor, etc.), that looks like:
 ```
 
 Replace `<MCP_HOST>:<MCP_PORT>` with wherever you're running this server (e.g.
-`192.168.111.111:8005`) and `<MCP_BEARER_TOKEN>` with the value from your `.env`. There's
+`192.168.1.50:8005`) and `<MCP_BEARER_TOKEN>` with the value from your `.env`. There's
 no `command`/`args`/`env` block like the old stdio config - the server must already be
 running (`uv run music-assistant-mcp`) for the client to connect to.
 
@@ -100,19 +100,19 @@ action dispatch) against a fake Music Assistant client.
 All four end-to-end scenarios below were run against a live server and fixed until
 green - the bugs found along the way are worth knowing about if you extend this further:
 
-- **`play(query="Relaxing music", player="DX3 Pro")`** — works.
-- **`play(query="The Prodigy", player="DX3 Pro", media_types=["artist"], radio_mode=True)`**
+- **`play(query="Relaxing music", player="Living Room")`** — works.
+- **`play(query="The Prodigy", player="Living Room", media_types=["artist"], radio_mode=True)`**
   — works. Found and fixed: a provider can return an irrelevant top "match" for an
   identity lookup (Tidal returned "Fatboy Slim" for "The Prodigy") - `pick_best()` now
   requires a name-match to the query for `artist`/`track`/`album` before applying source
   priority; playlists/radio stay priority-only since themed queries (e.g. "jazz vibes")
   legitimately won't literally match a provider's own curated name.
-- **`play(query="Coldplay", player="DX3 Pro", media_types=["artist"], scope="local")`**
+- **`play(query="Coldplay", player="Living Room", media_types=["artist"], scope="local")`**
   — works. Found and fixed: `music/search`'s `providers=` restriction is unreliable on
   this server (repeat identical requests sometimes returned every provider's results
   regardless of the filter) - `filter_by_providers()` now re-checks client-side, including
   matching a merged "library" item (`provider="library"`) via its `provider_mappings`.
-- **`group(action="join", players=["LedFX"], target_player="DX3 Pro")` then
+- **`group(action="join", players=["LedFX"], target_player="Living Room")` then
   `group(action="leave", players=["LedFX"])`** — works. Found and fixed:
   `players/cmd/group_many` takes `child_player_ids`, not `player_ids`.
 
