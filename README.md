@@ -211,6 +211,21 @@ drastically - no STEP-by-STEP sequencing, player-id tracking, or source-tiebreak
 needed. See [PROMPT.md](PROMPT.md) for a suggested replacement (persona + the one policy,
 confirming before a queue clear, that the tools don't enforce on their own).
 
+### Built-in instructions (for weaker/local models)
+
+The server also declares an `instructions` string as part of the MCP `initialize`
+response (`FastMCP("music-assistant", instructions=...)` in `server.py`) - most MCP
+clients (confirmed for the stdio transport by inspecting the raw `initialize` response)
+surface this to the model automatically, independent of whatever system prompt the host
+does or doesn't set. This exists because a smaller/local model (tested against a 9B
+model run through LM Studio) didn't reliably call `play` on its own without being told
+directly - "act immediately, don't ask permission, call the tool" needed to be explicit
+rather than something the model was expected to reason its way to. If you're running a
+frontier model this instructions text is redundant with PROMPT.md/common sense; if
+you're running something smaller/local, it's the part actually carrying the weight, and
+you likely don't need PROMPT.md as a system prompt at all beyond the confirm-before-clear
+policy it adds on top.
+
 ## Development
 
 ```bash
