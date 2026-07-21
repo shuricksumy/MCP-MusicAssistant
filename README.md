@@ -31,12 +31,14 @@ is baked into the tools themselves:
   naturally searches streaming playlists first, same as a human would.
   `radio_mode=true` starts a continuous radio mix seeded from the match instead of
   playing it once. If the top match turns out unplayable (e.g. an empty playlist), it
-  automatically tries the next candidate before giving up.
+  automatically tries the next candidate before giving up. `shuffle=true|false` sets the
+  queue's shuffle mode as part of the same call (e.g. "play this playlist shuffled") -
+  omitted leaves shuffle mode untouched.
 - **`play_random`** — build and play a random mix straight from the library, no search
   query needed - for "play something"/"surprise me"/"random mix from my local files"
-  requests. Same `scope`/`source` params as `play` (default `scope="all"` here, since
-  there's no query to search "online" against - the point is usually to surface your
-  own library).
+  requests. Same `scope`/`source`/`shuffle` params as `play` (default `scope="all"`
+  here, since there's no query to search "online" against - the point is usually to
+  surface your own library).
 - **`control`** — play/pause/stop/toggle/next/previous/seek, plus a read-only
   `status`/`get`/`now_playing` query for "what's playing?" (never sends a playback
   command).
@@ -348,6 +350,28 @@ Left as hard errors (genuinely ambiguous, no safe default exists): `volume` give
 than one of `level`/`adjust`/`mute` at once; `queue`'s `move_up`/`move_down`/
 `move_next`/`remove` without `item_id` (no safe guess for *which* item); `group`'s
 `action` if it's neither `join` nor `leave` (opposite operations, shouldn't guess).
+
+### Queue-growth bug (`option="play"` wasn't clearing the queue)
+
+Found live: a player's queue had silently grown to 3000+ items over normal use.
+Root cause was in `play()`/`play_random()` themselves, not user behavior -
+`music_assistant_models.enums.QueueOption` defines `PLAY` as "insert new item(s) at
+the current position and start playing" and `REPLACE` as "replace entire queue
+contents and start playing from index 0" - i.e. MA's own `"play"` option does **not**
+clear the queue, only `"replace"` does. Our tools' documented/expected default
+(`option="play"` meaning "clear queue and play now") was being sent to
+`player_queues/play_media` as the literal string `"play"`, so every play request was
+quietly inserting into an ever-growing queue instead of starting fresh. Fixed by
+mapping our `"play"` (and `"replace"`) option values to MA's `"replace"` on the wire,
+while `"next"`/`"add"` still pass through unchanged.
+
+Related queue-management coverage, all one call each: add to the current queue without
+clearing it (`play(query="...", option="add")` or `option="next"` to insert right
+after the current track), clear it (`queue(action="clear")` - agent confirms with the
+user first per the system prompt), shuffle the current queue
+(`queue(action="shuffle", shuffle=true|false)`), or shuffle as part of starting a new
+play (`play(query="...", shuffle=true)` / `play_random(shuffle=true)` - added so "play
+X shuffled" doesn't need a separate follow-up call).
 
 ### Slim now-playing/queue status
 

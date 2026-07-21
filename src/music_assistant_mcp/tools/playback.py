@@ -41,6 +41,12 @@ _COMMAND_ALIASES = {
 _STATUS_COMMANDS = {"get", "status", "now_playing", "nowplaying", "info", "state", "current"}
 
 _VALID_OPTIONS = {"play", "replace", "next", "add"}
+# MA's own QueueOption.PLAY inserts at the current position and does NOT clear the
+# queue - only REPLACE does (confirmed against music_assistant_models.enums.QueueOption's
+# docstring). Our "play" is documented/expected to mean "clear queue and play now", so it
+# has to be sent to the server as "replace" - sending it as literal "play" was silently
+# inserting into an ever-growing queue instead of clearing it on every request.
+_WS_OPTION = {"play": "replace", "replace": "replace", "next": "next", "add": "add"}
 
 
 def _normalize_option(option: str) -> str:
@@ -56,6 +62,7 @@ async def play(
     scope: str | None = None,
     option: str = "play",
     radio_mode: bool = False,
+    shuffle: bool | None = None,
 ) -> dict:
     """Search for media and play it on a player - one call, no separate search step.
 
@@ -79,6 +86,9 @@ async def play(
         that actually supports it (checked live) can do this - silently falls back to a
         normal single play otherwise (e.g. local/offline-only items, or playlists/albums/
         radio stations, none of which MA can generate a "similar tracks" mix for).
+    shuffle: set the queue's shuffle mode in the same call (e.g. "play this playlist
+        shuffled") instead of needing a separate `queue(action="shuffle")` call.
+        Omitted -> leaves shuffle mode as whatever it already was.
 
     If the top match turns out unplayable (e.g. an empty playlist, or a moved/deleted
     local file), automatically tries the next candidate before giving up.
@@ -133,7 +143,7 @@ async def play(
                 "player_queues/play_media",
                 queue_id=resolved_player.player_id,
                 media=candidate.uri,
-                option=option,
+                option=_WS_OPTION[option],
                 radio_mode=effective_radio_mode,
             )
             picked = candidate
@@ -148,12 +158,19 @@ async def play(
             f"(tried: {', '.join(skipped)}): {last_error}"
         )
 
+    if shuffle is not None:
+        await client.send(
+            "player_queues/shuffle", queue_id=resolved_player.player_id, shuffle_enabled=shuffle
+        )
+
     result = {
         "player": resolved_player.name,
         "matched": [c.name for c in candidates[:5]],
         "playing": {"name": picked.name, "provider": picked.provider, "uri": picked.uri},
         "radio_mode": effective_radio_mode,
     }
+    if shuffle is not None:
+        result["shuffle"] = shuffle
     if skipped:
         result["note"] = f"skipped unplayable match(es): {', '.join(skipped)}"
     if radio_mode and not effective_radio_mode:
@@ -172,6 +189,7 @@ async def play_random(
     source: str | None = None,
     count: int = 20,
     option: str = "play",
+    shuffle: bool | None = None,
 ) -> dict:
     """Build and play a random mix pulled straight from the library - no search query
     needed. Use for "play something"/"surprise me"/"random mix from my local files"
@@ -183,6 +201,8 @@ async def play_random(
     source: name/substring of one specific provider to restrict to instead of scope.
     count: how many random tracks to queue (1-100, default 20).
     option: "play" (clear queue and play now, default), "replace", "next", "add".
+    shuffle: set the queue's shuffle mode in the same call. Omitted -> leaves shuffle
+        mode as whatever it already was.
     """
     client = await get_client()
     resolved_player = await resolve_player(client, player)
@@ -202,13 +222,20 @@ async def play_random(
         )
 
     await client.send(
-        "player_queues/play_media", queue_id=resolved_player.player_id, media=uris, option=option
+        "player_queues/play_media", queue_id=resolved_player.player_id, media=uris, option=_WS_OPTION[option]
     )
-    return {
+    if shuffle is not None:
+        await client.send(
+            "player_queues/shuffle", queue_id=resolved_player.player_id, shuffle_enabled=shuffle
+        )
+    result = {
         "player": resolved_player.name,
         "count": len(uris),
         "tracks": [t.get("name") for t in tracks[: len(uris)]],
     }
+    if shuffle is not None:
+        result["shuffle"] = shuffle
+    return result
 
 
 async def control(

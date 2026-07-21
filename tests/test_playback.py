@@ -126,7 +126,9 @@ async def test_play_option_normalizes_invalid_to_play(patched_client):
     await play(query="chill", player="Living Room", option="bogus")
     command, kwargs = client.calls[-1]
     assert command == "player_queues/play_media"
-    assert kwargs["option"] == "play"
+    # our "play" (clear queue and play now) must be sent as MA's "replace" - MA's own
+    # "play" option inserts at the current position without clearing the queue.
+    assert kwargs["option"] == "replace"
 
 
 async def test_play_radio_mode_disabled_for_local_only_pick(patched_client):
@@ -288,7 +290,61 @@ async def test_play_random_option_normalized(patched_client):
     await play_random(player="Living Room", option="bogus")
     command, kwargs = client.calls[-1]
     assert command == "player_queues/play_media"
-    assert kwargs["option"] == "play"
+    assert kwargs["option"] == "replace"
+
+
+async def test_play_default_option_clears_queue_via_replace_not_ma_play(patched_client):
+    # Regression test: MA's own "play" queue-option inserts at the current position
+    # and does NOT clear the queue - only "replace" does. Sending our default option
+    # as literal "play" caused the queue to grow unbounded across requests instead of
+    # starting fresh each time.
+    client = patched_client(
+        **{"music/search": {"playlists": [{"uri": "spotify--x://playlist/1", "name": "Chill"}]}}
+    )
+    await play(query="chill", player="Living Room")
+    command, kwargs = client.calls[-1]
+    assert command == "player_queues/play_media"
+    assert kwargs["option"] == "replace"
+
+
+async def test_play_shuffle_sends_shuffle_command_when_given(patched_client):
+    client = patched_client(
+        **{"music/search": {"playlists": [{"uri": "spotify--x://playlist/1", "name": "Chill"}]}}
+    )
+    result = await play(query="chill", player="Living Room", shuffle=True)
+    assert result["shuffle"] is True
+    shuffle_calls = [c for c in client.calls if c[0] == "player_queues/shuffle"]
+    assert len(shuffle_calls) == 1
+    assert shuffle_calls[0][1]["shuffle_enabled"] is True
+
+
+async def test_play_omitted_shuffle_sends_no_shuffle_command(patched_client):
+    client = patched_client(
+        **{"music/search": {"playlists": [{"uri": "spotify--x://playlist/1", "name": "Chill"}]}}
+    )
+    result = await play(query="chill", player="Living Room")
+    assert "shuffle" not in result
+    assert all(c[0] != "player_queues/shuffle" for c in client.calls)
+
+
+async def test_play_random_shuffle_sends_shuffle_command_when_given(patched_client):
+    client = patched_client(**{"music/tracks/library_items": RANDOM_TRACKS})
+    result = await play_random(player="Living Room", shuffle=False)
+    assert result["shuffle"] is False
+    shuffle_calls = [c for c in client.calls if c[0] == "player_queues/shuffle"]
+    assert len(shuffle_calls) == 1
+    assert shuffle_calls[0][1]["shuffle_enabled"] is False
+
+
+async def test_play_explicit_next_and_add_pass_through_unchanged(patched_client):
+    client = patched_client(
+        **{"music/search": {"playlists": [{"uri": "spotify--x://playlist/1", "name": "Chill"}]}}
+    )
+    await play(query="chill", player="Living Room", option="next")
+    assert client.calls[-1][1]["option"] == "next"
+
+    await play(query="chill", player="Living Room", option="add")
+    assert client.calls[-1][1]["option"] == "add"
 
 
 # --- play() retries the next candidate if the top match is unplayable ---
