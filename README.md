@@ -220,6 +220,45 @@ internally, so the flag is what actually works here. If you're on schema ≥ 34,
 may no longer be honored and enqueuing `radio_playlist://playlist/<uri>` directly (per
 `music_assistant_client.player_queues.radio_playlist_uri`) would be the thing to try.
 
+### radio_mode capability gating
+
+Checked live against each configured provider's actual `supported_features`: only
+providers reporting `similar_tracks`/`similar_artists` (Spotify, Tidal, Apple Music on
+this server) can generate an actual radio mix - `webdav` (the only local/offline
+provider here) reports neither. Requesting `radio_mode=True` for something MA can't
+generate a mix for (a local-only pick, or any playlist/album/radio-station media type,
+since those have no "similar tracks" concept at all) used to silently send the flag
+anyway and just play normally with no indication anything was skipped. `play()` now
+checks `providers_logic.supports_radio()` before honoring the flag and returns
+`radio_mode: false` plus an explanatory `note` when it had to fall back, instead of
+quietly no-op'ing. Verified live: stays `true` for a Spotify artist, correctly falls
+back with a note for a Tidal playlist and for a local/webdav-backed artist.
+
+### Lenient defaults (agent-mistake tolerant)
+
+Per a request to make sure a forgotten/wrong parameter never turns into a hard "bad
+request" - audited every tool for this and fixed the gaps:
+- `play`/`search`: unrecognized `media_types` entries (plurals, "song", typos) are
+  mapped to the right value or dropped, falling back to `["playlist"]` if nothing valid
+  remains; `option` falls back to `"play"` if not one of the four valid values.
+- `control`: `command` is case-insensitive and accepts a few synonyms (`resume`, `skip`,
+  `prev`, ...); anything still unrecognized falls back to `"play"` (with a `note`)
+  instead of raising. `seek_seconds` is clamped to ≥ 0.
+- `volume`: calling with none of `level`/`adjust`/`mute` set now just reports the
+  current level instead of erroring; `level` is clamped to 0-100; `adjust` is
+  case-insensitive and accepts synonyms (`louder`, `quieter`, ...); `group=true` with
+  `mute` no longer errors - it just mutes the single player and notes why.
+- `queue`: an unrecognized `action` falls back to `"get"` (with a `note`) instead of
+  raising; `action="shuffle"` without a `shuffle` bool defaults to `True`;
+  `action="repeat"` without a valid `repeat` value defaults to `"all"`; `action` is
+  case-insensitive.
+- `group`: `action` is case-insensitive.
+
+Left as hard errors (genuinely ambiguous, no safe default exists): `volume` given more
+than one of `level`/`adjust`/`mute` at once; `queue`'s `move_up`/`move_down`/
+`move_next`/`remove` without `item_id` (no safe guess for *which* item); `group`'s
+`action` if it's neither `join` nor `leave` (opposite operations, shouldn't guess).
+
 ### Still unverified
 - `transfer` (`player_queues/transfer`) wasn't exercised in the live scenarios above.
 - Local/offline scope was only tested against a `webdav` provider (this server's only

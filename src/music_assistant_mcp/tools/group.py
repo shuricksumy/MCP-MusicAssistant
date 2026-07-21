@@ -16,14 +16,16 @@ async def group(action: str, players: list[str], target_player: str | None = Non
     resolved = [await resolve_player(client, p) for p in players]
     player_ids = [p.player_id for p in resolved]
 
-    if action == "join":
+    normalized_action = (action or "").strip().lower()
+
+    if normalized_action == "join":
         target = await resolve_player(client, target_player)
         await client.send(
             "players/cmd/group_many", child_player_ids=player_ids, target_player=target.player_id
         )
         return {"action": "join", "players": [p.name for p in resolved], "target": target.name}
 
-    if action == "leave":
+    if normalized_action == "leave":
         await client.send("players/cmd/ungroup_many", player_ids=player_ids)
         return {"action": "leave", "players": [p.name for p in resolved]}
 

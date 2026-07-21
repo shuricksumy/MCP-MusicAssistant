@@ -20,6 +20,32 @@ _RESULT_KEYS = {
     "radio": "radio",
 }
 
+_MEDIA_TYPE_ALIASES = {
+    "song": "track",
+    "songs": "track",
+    "tracks": "track",
+    "playlists": "playlist",
+    "albums": "album",
+    "artists": "artist",
+    "radios": "radio",
+    "station": "radio",
+    "stations": "radio",
+}
+
+
+def normalize_media_types(media_types: list[str] | None) -> list[str]:
+    """Map common mistakes (plurals, "song") to valid values and drop anything still
+    unrecognized, rather than sending it through and letting the server reject it -
+    an agent passing a slightly-off value shouldn't hard-fail the whole call."""
+    if not media_types:
+        return list(DEFAULT_MEDIA_TYPES)
+    normalized: list[str] = []
+    for mt in media_types:
+        candidate = _MEDIA_TYPE_ALIASES.get(mt.strip().lower(), mt.strip().lower())
+        if candidate in _RESULT_KEYS and candidate not in normalized:
+            normalized.append(candidate)
+    return normalized or list(DEFAULT_MEDIA_TYPES)
+
 
 def _domain_of(provider_id: str | None) -> str | None:
     """Provider fields/URIs use an instance id like "spotify--9hcJiXgW" or
@@ -151,7 +177,8 @@ async def search_and_pick(
     filter_by_providers() since the server-side restriction was found to be unreliable.
     `source` still applies an additional client-side tiebreak/filter on top.
     """
-    media_types = media_types or DEFAULT_MEDIA_TYPES
+    media_types = normalize_media_types(media_types)
+    limit = max(1, min(50, limit or 15))
     raw = await client.send(
         "music/search",
         search_query=query,

@@ -16,12 +16,16 @@ class ProviderNotFoundError(RuntimeError):
         super().__init__(f"No provider matches '{requested}'. Available providers: {names}")
 
 
+_RADIO_FEATURES = {"similar_tracks", "similar_artists"}
+
+
 @dataclass(frozen=True)
 class ProviderInstance:
     instance_id: str
     domain: str
     name: str
     is_streaming: bool | None = None
+    supported_features: frozenset[str] = frozenset()
 
     @classmethod
     def from_raw(cls, raw: dict) -> "ProviderInstance":
@@ -30,6 +34,7 @@ class ProviderInstance:
             domain=raw.get("domain"),
             name=raw.get("name") or raw.get("domain"),
             is_streaming=raw.get("is_streaming_provider"),
+            supported_features=frozenset(raw.get("supported_features") or ()),
         )
 
 
@@ -58,12 +63,13 @@ def resolve_provider_filter(
             raise ProviderNotFoundError(source, providers)
         return [p.instance_id for p in matches]
 
-    if scope in (None, "all"):
+    normalized_scope = (scope or "all").strip().lower()
+    if normalized_scope == "all":
         return None
 
-    if scope == "online":
+    if normalized_scope == "online":
         matches = [p for p in providers if p.is_streaming is True]
-    elif scope == "local":
+    elif normalized_scope == "local":
         matches = [p for p in providers if p.is_streaming is False]
     else:
         raise ValueError(f"scope must be 'online', 'local', or 'all', got '{scope}'")
@@ -71,3 +77,32 @@ def resolve_provider_filter(
     if not matches:
         raise ProviderNotFoundError(scope, providers)
     return [p.instance_id for p in matches]
+
+
+def supports_radio(
+    providers: list[ProviderInstance],
+    media_type: str,
+    provider_ids: tuple[str, ...],
+    allowed_instance_ids: list[str] | None,
+) -> bool:
+    """Whether a radio/similar-tracks mix can plausibly be generated for this item.
+
+    Confirmed against a live server: local file providers (e.g. webdav) don't report
+    `similar_tracks`/`similar_artists` at all, so requesting radio_mode for an item only
+    backed by those never produces an actual dynamic mix - this lets `play()` detect
+    that and fall back to a normal (single) play instead of silently no-oping.
+    `allowed_instance_ids` restricts the check to the scope/source actually requested
+    (e.g. scope="local" shouldn't pass because a cross-provider library item also
+    happens to have an unused online backing).
+    """
+    if media_type not in ("artist", "track"):
+        return False
+
+    candidate_ids = set(provider_ids)
+    if allowed_instance_ids is not None:
+        candidate_ids &= set(allowed_instance_ids)
+
+    by_id = {p.instance_id: p for p in providers}
+    return any(
+        by_id[pid].supported_features & _RADIO_FEATURES for pid in candidate_ids if pid in by_id
+    )

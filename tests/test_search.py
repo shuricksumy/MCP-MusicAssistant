@@ -3,6 +3,7 @@ from music_assistant_mcp.search import (
     filter_by_providers,
     filter_by_source,
     flatten_results,
+    normalize_media_types,
     pick_best,
     search_and_pick,
 )
@@ -166,3 +167,30 @@ def test_pick_best_playlist_ignores_name_match_uses_priority_only():
         query="jazz vibes",
     )
     assert best is themed_but_differently_named_top_priority
+
+
+# --- normalize_media_types ---
+
+
+def test_normalize_media_types_none_defaults_to_playlist():
+    assert normalize_media_types(None) == ["playlist"]
+
+
+def test_normalize_media_types_empty_list_defaults_to_playlist():
+    assert normalize_media_types([]) == ["playlist"]
+
+
+def test_normalize_media_types_maps_common_aliases():
+    assert normalize_media_types(["song", "Albums", " ARTISTS "]) == ["track", "album", "artist"]
+
+
+def test_normalize_media_types_drops_unrecognized_but_keeps_valid():
+    assert normalize_media_types(["track", "nonsense"]) == ["track"]
+
+
+def test_normalize_media_types_all_unrecognized_defaults_to_playlist():
+    assert normalize_media_types(["nonsense", "garbage"]) == ["playlist"]
+
+
+def test_normalize_media_types_deduplicates():
+    assert normalize_media_types(["track", "tracks", "song"]) == ["track"]

@@ -6,11 +6,32 @@ from music_assistant_mcp.providers import ProviderInstance
 from fakes import FakeMAClient
 
 STREAMING = [
-    {"instance_id": "spotify--abc", "domain": "spotify", "name": "Spotify", "type": "music", "is_streaming_provider": True},
-    {"instance_id": "tidal--def", "domain": "tidal", "name": "Tidal", "type": "music", "is_streaming_provider": True},
+    {
+        "instance_id": "spotify--abc",
+        "domain": "spotify",
+        "name": "Spotify",
+        "type": "music",
+        "is_streaming_provider": True,
+        "supported_features": ["search", "similar_tracks"],
+    },
+    {
+        "instance_id": "tidal--def",
+        "domain": "tidal",
+        "name": "Tidal",
+        "type": "music",
+        "is_streaming_provider": True,
+        "supported_features": ["search", "similar_tracks"],
+    },
 ]
 LOCAL = [
-    {"instance_id": "filesystem_smb--ghi", "domain": "filesystem_smb", "name": "NAS Music", "type": "music", "is_streaming_provider": False},
+    {
+        "instance_id": "filesystem_smb--ghi",
+        "domain": "filesystem_smb",
+        "name": "NAS Music",
+        "type": "music",
+        "is_streaming_provider": False,
+        "supported_features": ["search"],
+    },
 ]
 NON_MUSIC = [
     {"instance_id": "hass--xyz", "domain": "hass", "name": "Home Assistant", "type": "plugin", "is_streaming_provider": None},
@@ -68,3 +89,45 @@ def test_resolve_provider_filter_invalid_scope_raises():
 def test_resolve_provider_filter_source_takes_priority_over_scope():
     result = providers_logic.resolve_provider_filter(_providers(), "spotify", "local")
     assert result == ["spotify--abc"]
+
+
+def test_resolve_provider_filter_scope_is_case_insensitive():
+    result = providers_logic.resolve_provider_filter(_providers(), None, "ONLINE")
+    assert set(result) == {"spotify--abc", "tidal--def"}
+
+
+# --- supports_radio ---
+
+
+def test_supports_radio_true_for_streaming_artist_no_scope_restriction():
+    assert providers_logic.supports_radio(_providers(), "artist", ("spotify--abc",), None)
+
+
+def test_supports_radio_false_for_local_only_provider():
+    assert not providers_logic.supports_radio(
+        _providers(), "artist", ("filesystem_smb--ghi",), ["filesystem_smb--ghi"]
+    )
+
+
+def test_supports_radio_false_for_playlist_regardless_of_provider():
+    assert not providers_logic.supports_radio(_providers(), "playlist", ("spotify--abc",), None)
+
+
+def test_supports_radio_respects_allowed_instance_ids_scope():
+    # item is backed by both a streaming provider (supports radio) and a local one, but
+    # the request was scoped to local only - shouldn't "leak" the streaming capability.
+    assert not providers_logic.supports_radio(
+        _providers(),
+        "artist",
+        ("spotify--abc", "filesystem_smb--ghi"),
+        ["filesystem_smb--ghi"],
+    )
+
+
+def test_supports_radio_true_when_any_backing_provider_in_scope_supports_it():
+    assert providers_logic.supports_radio(
+        _providers(),
+        "artist",
+        ("spotify--abc", "filesystem_smb--ghi"),
+        None,
+    )
