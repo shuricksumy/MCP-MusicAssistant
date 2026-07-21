@@ -169,6 +169,31 @@ docker run -d --name music-assistant-mcp -p 8005:8005 \
 Built and run-tested (`docker build` + `docker run` + a bearer-authed MCP `initialize`
 call) as part of this repo's verification.
 
+### Pre-built multi-arch images
+
+`.github/workflows/docker-publish.yml` builds and pushes `linux/amd64` +
+`linux/arm64` images to GitHub Container Registry on every push to `main` and on
+version tags (`v*.*.*`) - verified locally that the Dockerfile builds cleanly for both
+architectures via `docker buildx build --platform linux/amd64,linux/arm64`. No extra
+registry credentials to set up on the publishing side - it authenticates with the
+repo's built-in `GITHUB_TOKEN`. The package may need to be marked public in the repo's
+Packages settings the first time (GitHub defaults new packages to private).
+
+```bash
+docker pull ghcr.io/shuricksumy/music-assistant-mcp:main
+```
+
+### Running with docker-compose
+
+`docker-compose.yml` pulls the pre-built image above (so the workflow needs to have run
+at least once, and the package needs to be public) and reads its config from `.env` in
+the same directory:
+
+```bash
+cp .env.example .env   # fill it in first, see Config above
+docker compose up -d
+```
+
 ### Using mcp-proxy (for hosts that only support stdio-launched servers)
 
 Some MCP hosts only support the `command`/`args`/`env`, stdio-launch style of config

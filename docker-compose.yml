@@ -1,0 +1,10 @@
+services:
+  music-assistant-mcp:
+    image: ghcr.io/shuricksumy/music-assistant-mcp:main
+    container_name: music-assistant-mcp
+    pull_policy: always
+    restart: unless-stopped
+    ports:
+      - "${MCP_PORT:-8005}:${MCP_PORT:-8005}"
+    env_file:
+      - .env
