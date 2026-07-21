@@ -48,6 +48,7 @@ endpoint at `/mcp`, requiring `Authorization: Bearer <MCP_BEARER_TOKEN>`.
 | `MCP_BEARER_TOKEN` | Shared secret clients must send as `Authorization: Bearer <token>` |
 | `DEFAULT_PLAYER_NAME` | Used when a tool call doesn't name a player |
 | `SOURCE_PRIORITY` | Comma-separated provider tiebreak order, e.g. `tidal,spotify,apple_music` |
+| `MCP_TRANSPORT` | `streamable-http` (default, for n8n etc.) or `stdio` (for hosts that spawn this as a local subprocess - see below); `MCP_HOST`/`MCP_PORT`/`MCP_BEARER_TOKEN` are ignored in `stdio` mode |
 
 ### Adding to an MCP client config
 
@@ -73,9 +74,44 @@ server entry (Claude Desktop, Cursor, etc.), that looks like:
 ```
 
 Replace `<MCP_HOST>:<MCP_PORT>` with wherever you're running this server (e.g.
-`192.168.1.50:8005`) and `<MCP_BEARER_TOKEN>` with the value from your `.env`. There's
-no `command`/`args`/`env` block like the old stdio config - the server must already be
-running (`uv run music-assistant-mcp`) for the client to connect to.
+`192.168.1.50:8005`) and `<MCP_BEARER_TOKEN>` with the value from your `.env`. This
+requires the server to already be running (`uv run music-assistant-mcp`, or in Docker
+below) - unlike the `command`/`args`/`env` style below, nothing gets spawned here.
+
+### Running via uvx straight from GitHub (stdio)
+
+If your MCP host only supports the `command`/`args`/`env`, stdio-launched style of
+config (the same shape the old community server used), set `MCP_TRANSPORT=stdio` and
+it works the same way - no bearer token needed, since the host owns the process's
+stdio pipes directly instead of talking to it over the network:
+
+```json
+{
+  "mcpServers": {
+    "music-assistant": {
+      "enabled": true,
+      "timeout": 60,
+      "command": "uvx",
+      "args": [
+        "--from",
+        "git+https://github.com/shuricksumy/MCP-MusicAssistant",
+        "music-assistant-mcp"
+      ],
+      "env": {
+        "MA_SERVER_URL": "http://<MA_SERVER_IP>:8095",
+        "MA_TOKEN": "<your-ma-token>",
+        "MCP_TRANSPORT": "stdio"
+      },
+      "transportType": "stdio"
+    }
+  }
+}
+```
+
+Confirmed working locally: piping a real `initialize` request into
+`MCP_TRANSPORT=stdio uv run music-assistant-mcp` returns a clean JSON-RPC response on
+stdout with nothing else mixed in (logging goes to stderr, so it won't corrupt the
+protocol stream).
 
 ### Running in Docker
 

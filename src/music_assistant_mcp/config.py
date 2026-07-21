@@ -19,6 +19,9 @@ class Settings:
     ma_server_url: str = field(default_factory=lambda: os.environ.get("MA_SERVER_URL", ""))
     ma_token: str | None = field(default_factory=lambda: os.environ.get("MA_TOKEN") or None)
 
+    mcp_transport: str = field(
+        default_factory=lambda: os.environ.get("MCP_TRANSPORT", "streamable-http")
+    )
     mcp_host: str = field(default_factory=lambda: os.environ.get("MCP_HOST", "0.0.0.0"))
     mcp_port: int = field(default_factory=lambda: int(os.environ.get("MCP_PORT", "8005")))
     mcp_bearer_token: str | None = field(
