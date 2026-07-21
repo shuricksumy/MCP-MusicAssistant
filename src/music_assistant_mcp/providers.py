@@ -49,7 +49,16 @@ def resolve_provider_filter(
     providers: list[ProviderInstance], source: str | None, scope: str | None
 ) -> list[str] | None:
     """Returns instance_ids to pass as music/search's `providers=` kwarg, or None for
-    no restriction (search everything, today's default behavior)."""
+    no restriction (search everything).
+
+    Default (both `source` and `scope` omitted) is "online" - this matches how a human
+    expects "play something"/"play <artist>" to behave: check streaming services first,
+    same as they'd habitually reach for Spotify/Tidal before their own local files. The
+    caller (play()/search()) is expected to retry with `scope="all"` (providers=None) if
+    this default-online search comes back empty, so a local-only match still gets found
+    without the caller having to ask for it by name. Explicit `scope="all"`/`"local"`
+    is respected exactly, no implicit fallback.
+    """
     if source:
         needle = source.strip().lower()
         matches = [
@@ -63,7 +72,7 @@ def resolve_provider_filter(
             raise ProviderNotFoundError(source, providers)
         return [p.instance_id for p in matches]
 
-    normalized_scope = (scope or "all").strip().lower()
+    normalized_scope = (scope or "online").strip().lower()
     if normalized_scope == "all":
         return None
 

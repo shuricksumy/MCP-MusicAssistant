@@ -169,6 +169,21 @@ def test_pick_best_playlist_ignores_name_match_uses_priority_only():
     assert best is themed_but_differently_named_top_priority
 
 
+def test_pick_best_artist_returns_none_when_nothing_actually_matches():
+    # Regression: a live nonsense query ("asdkfjhqwoeiuasdf") still "confidently"
+    # returned an unrelated artist, since a source-priority tiebreak among equally
+    # unmatched candidates always picks something - must return None instead when no
+    # candidate genuinely matches an artist/track/album query by name.
+    unrelated_artist = MediaItem(uri="spotify--x://artist/1", name="Anna Trincher", media_type="artist")
+    assert pick_best([unrelated_artist], query="asdkfjhqwoeiuasdf") is None
+
+
+def test_pick_best_track_returns_none_when_nothing_matches_even_with_priority():
+    unrelated_a = MediaItem(uri="tidal--x://track/1", name="Totally Different", media_type="track")
+    unrelated_b = MediaItem(uri="spotify--x://track/2", name="Also Unrelated", media_type="track")
+    assert pick_best([unrelated_a, unrelated_b], query="gibberish query xyz") is None
+
+
 # --- normalize_media_types ---
 
 

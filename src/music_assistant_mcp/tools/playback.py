@@ -1,9 +1,17 @@
 from mcp.server.fastmcp import FastMCP
+from music_assistant_models.errors import MediaNotFoundError, UnplayableMediaError
 
 from .. import providers as providers_logic
 from ..ma_client import get_client
 from ..players import resolve_player
 from ..search import normalize_media_types, search_and_pick
+
+# A matched search result can still turn out unplayable server-side (e.g. an empty
+# user-created playlist, or a moved/deleted local file) - confirmed live with a
+# same-named local "Jazz" playlist that had no tracks in it. Retrying the next
+# candidate is much smoother than failing the whole call over one bad pick.
+_UNPLAYABLE_ERRORS = (MediaNotFoundError, UnplayableMediaError)
+_MAX_PLAY_ATTEMPTS = 3
 
 _TRANSPORT_COMMANDS = {
     "play": "play",
@@ -54,8 +62,11 @@ async def play(
         automatically using the configured provider priority order.
     scope: "online" (streaming providers only, e.g. Spotify/Tidal/Apple - rich
         thematic search), "local" (local/SMB/WebDAV file providers only - literal
-        matching), or "all" (default - search everywhere, today's behavior).
-        Ignored if `source` is given.
+        matching), or "all" (search everywhere). Omitted -> defaults to "online"
+        (matches how a human would habitually reach for Spotify/Tidal before their own
+        files), automatically broadening to everything if nothing turns up there - so a
+        local-only match still gets found without asking for it by name. Ignored if
+        `source` is given.
     option: "play" (clear queue and play now, default), "replace", "next", "add".
         Unrecognized values fall back to "play".
     radio_mode: start a continuous radio mix seeded from the match (e.g. an artist or
@@ -63,11 +74,27 @@ async def play(
         that actually supports it (checked live) can do this - silently falls back to a
         normal single play otherwise (e.g. local/offline-only items, or playlists/albums/
         radio stations, none of which MA can generate a "similar tracks" mix for).
+
+    If the top match turns out unplayable (e.g. an empty playlist, or a moved/deleted
+    local file), automatically tries the next candidate before giving up.
     """
+    if not query or not query.strip():
+        raise ValueError(
+            "query is required and can't be empty - for a query-less 'surprise me'/random "
+            "pick, use play_random() instead"
+        )
+
     client = await get_client()
     resolved_player = await resolve_player(client, player)
     available_providers = await providers_logic.list_providers(client)
-    provider_filter = providers_logic.resolve_provider_filter(available_providers, source, scope)
+
+    used_default_scope = not source and not scope
+    try:
+        provider_filter = providers_logic.resolve_provider_filter(available_providers, source, scope)
+    except providers_logic.ProviderNotFoundError:
+        if not used_default_scope:
+            raise
+        provider_filter = None  # no online providers configured - just search everything
 
     media_types = normalize_media_types(media_types)
     option = _normalize_option(option)
@@ -75,35 +102,108 @@ async def play(
     best, candidates = await search_and_pick(
         client, query, media_types=media_types, source=source, providers=provider_filter
     )
+    if best is None and used_default_scope and provider_filter is not None:
+        # nothing found among online providers (the implicit default) - broaden to
+        # everything, including local, rather than failing outright.
+        provider_filter = None
+        best, candidates = await search_and_pick(
+            client, query, media_types=media_types, source=source, providers=provider_filter
+        )
     if best is None:
         raise ValueError(f"No results found for '{query}'" + (f" from {source}" if source else ""))
 
-    effective_radio_mode = radio_mode and providers_logic.supports_radio(
-        available_providers,
-        best.media_type,
-        (*best.provider_instances, *([best.provider] if best.provider else ())),
-        provider_filter,
-    )
+    attempts = [best, *(c for c in candidates if c is not best)][:_MAX_PLAY_ATTEMPTS]
+    skipped: list[str] = []
+    last_error: Exception | None = None
+    picked = None
+    for candidate in attempts:
+        effective_radio_mode = radio_mode and providers_logic.supports_radio(
+            available_providers,
+            candidate.media_type,
+            (*candidate.provider_instances, *([candidate.provider] if candidate.provider else ())),
+            provider_filter,
+        )
+        try:
+            await client.send(
+                "player_queues/play_media",
+                queue_id=resolved_player.player_id,
+                media=candidate.uri,
+                option=option,
+                radio_mode=effective_radio_mode,
+            )
+            picked = candidate
+            break
+        except _UNPLAYABLE_ERRORS as err:
+            last_error = err
+            skipped.append(candidate.name)
 
-    await client.send(
-        "player_queues/play_media",
-        queue_id=resolved_player.player_id,
-        media=best.uri,
-        option=option,
-        radio_mode=effective_radio_mode,
-    )
+    if picked is None:
+        raise ValueError(
+            f"Found matches for '{query}' but none were playable "
+            f"(tried: {', '.join(skipped)}): {last_error}"
+        )
+
     result = {
         "player": resolved_player.name,
         "matched": [c.name for c in candidates[:5]],
-        "playing": {"name": best.name, "provider": best.provider, "uri": best.uri},
+        "playing": {"name": picked.name, "provider": picked.provider, "uri": picked.uri},
         "radio_mode": effective_radio_mode,
     }
+    if skipped:
+        result["note"] = f"skipped unplayable match(es): {', '.join(skipped)}"
     if radio_mode and not effective_radio_mode:
-        result["note"] = (
+        existing_note = result.get("note")
+        radio_note = (
             "radio_mode was requested but isn't supported for this pick (local/offline "
             "provider, or a playlist/album/radio station) - played normally instead"
         )
+        result["note"] = f"{existing_note}; {radio_note}" if existing_note else radio_note
     return result
+
+
+async def play_random(
+    player: str | None = None,
+    scope: str | None = None,
+    source: str | None = None,
+    count: int = 20,
+    option: str = "play",
+) -> dict:
+    """Build and play a random mix pulled straight from the library - no search query
+    needed. Use for "play something"/"surprise me"/"random mix from my local files"
+    type requests, as opposed to `play` which needs something to search for.
+
+    scope: "local" (only your own local/SMB/WebDAV files - e.g. "play something random
+        from my local library"), "online" (only synced/favorited tracks from streaming
+        providers), or "all" (default - anything in your library, local or online).
+    source: name/substring of one specific provider to restrict to instead of scope.
+    count: how many random tracks to queue (1-100, default 20).
+    option: "play" (clear queue and play now, default), "replace", "next", "add".
+    """
+    client = await get_client()
+    resolved_player = await resolve_player(client, player)
+    available_providers = await providers_logic.list_providers(client)
+    provider_filter = providers_logic.resolve_provider_filter(available_providers, source, scope or "all")
+
+    count = max(1, min(100, count))
+    option = _normalize_option(option)
+
+    tracks = await client.send(
+        "music/tracks/library_items", limit=count, order_by="random", provider=provider_filter
+    )
+    uris = [t["uri"] for t in tracks or [] if t.get("uri")]
+    if not uris:
+        raise ValueError(
+            "No tracks found in your library" + (f" for scope='{scope}'" if scope else "")
+        )
+
+    await client.send(
+        "player_queues/play_media", queue_id=resolved_player.player_id, media=uris, option=option
+    )
+    return {
+        "player": resolved_player.name,
+        "count": len(uris),
+        "tracks": [t.get("name") for t in tracks[: len(uris)]],
+    }
 
 
 async def control(
@@ -144,4 +244,5 @@ async def control(
 
 def register(mcp: FastMCP) -> None:
     mcp.tool()(play)
+    mcp.tool()(play_random)
     mcp.tool()(control)

@@ -77,8 +77,9 @@ def test_resolve_provider_filter_scope_all_returns_none():
     assert providers_logic.resolve_provider_filter(_providers(), None, "all") is None
 
 
-def test_resolve_provider_filter_no_scope_no_source_returns_none():
-    assert providers_logic.resolve_provider_filter(_providers(), None, None) is None
+def test_resolve_provider_filter_no_scope_no_source_defaults_to_online():
+    result = providers_logic.resolve_provider_filter(_providers(), None, None)
+    assert set(result) == {"spotify--abc", "tidal--def"}
 
 
 def test_resolve_provider_filter_invalid_scope_raises():

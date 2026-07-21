@@ -8,5 +8,10 @@ class FakeMAClient:
     async def send(self, command: str, **kwargs) -> object:
         self.calls.append((command, kwargs))
         if command in self.responses:
-            return self.responses[command]
+            response = self.responses[command]
+            # a callable response can raise or vary per call (e.g. fail once, then
+            # succeed) - given the call count so far (including this one).
+            if callable(response):
+                return response(len([c for c in self.calls if c[0] == command]), kwargs)
+            return response
         return None

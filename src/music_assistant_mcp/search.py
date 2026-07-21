@@ -142,7 +142,15 @@ def pick_best(
 ) -> MediaItem | None:
     """Pick the best item: for artist/track/album, a name match to `query` always wins
     over source priority; for playlist/radio, source priority alone decides. Ties within
-    a group keep provider priority order, then original (relevance) order."""
+    a group keep provider priority order, then original (relevance) order.
+
+    Returns None (no genuine match) rather than the top-ranked item when doing an
+    artist/track/album lookup and *nothing* actually matched the query by name -
+    confirmed live that a nonsense query can otherwise still "confidently" return some
+    unrelated artist, since a source-priority tiebreak among equally-unmatched
+    candidates always picks something. Playlists/radio are unaffected (no name-match
+    requirement to begin with).
+    """
     if not items:
         return None
 
@@ -159,7 +167,11 @@ def pick_best(
             match_rank = 0
         return (match_rank, source_rank)
 
-    return min(items, key=rank)
+    best = min(items, key=rank)
+    match_rank, _ = rank(best)
+    if query and best.media_type in _IDENTITY_MEDIA_TYPES and match_rank == 1:
+        return None
+    return best
 
 
 async def search_and_pick(

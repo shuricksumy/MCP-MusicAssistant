@@ -16,16 +16,31 @@ async def search(
     user just wants to know what's available. media_types defaults to ["playlist"].
 
     source: name/substring of one specific provider (e.g. "tidal", "my-nas-share").
-    scope: "online" (streaming providers only), "local" (file providers only), or
-        "all" (default). Ignored if `source` is given.
+    scope: "online" (streaming providers only), "local" (file providers only), or "all"
+        (search everywhere). Omitted -> defaults to "online", automatically broadening
+        to everything if nothing turns up there. Ignored if `source` is given.
     """
+    if not query or not query.strip():
+        raise ValueError("query is required and can't be empty")
+
     client = await get_client()
     available_providers = await providers_logic.list_providers(client)
-    provider_filter = providers_logic.resolve_provider_filter(available_providers, source, scope)
+
+    used_default_scope = not source and not scope
+    try:
+        provider_filter = providers_logic.resolve_provider_filter(available_providers, source, scope)
+    except providers_logic.ProviderNotFoundError:
+        if not used_default_scope:
+            raise
+        provider_filter = None
 
     _, candidates = await search_and_pick(
         client, query, media_types=media_types, limit=limit, source=source, providers=provider_filter
     )
+    if not candidates and used_default_scope and provider_filter is not None:
+        _, candidates = await search_and_pick(
+            client, query, media_types=media_types, limit=limit, source=source, providers=None
+        )
     return [
         {"name": c.name, "media_type": c.media_type, "provider": c.provider, "uri": c.uri}
         for c in candidates

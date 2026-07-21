@@ -9,9 +9,18 @@ is baked into the tools themselves:
 - **`play`** — search + resolve player + provider tiebreak + play, in one call. Supports
   `scope="online"|"local"|"all"` to restrict to streaming providers (Spotify/Tidal/Apple
   - rich thematic/"vibe" search) vs local file providers (SMB/WebDAV/local dir - literal
-  matching), or `source="tidal"`/`"my-nas-share"` to force one specific provider.
+  matching), or `source="tidal"`/`"my-nas-share"` to force one specific provider. Omitted
+  `scope` defaults to "online" (broadening to everything if nothing turns up there), and
+  `media_types` defaults to `["playlist"]` - so "play something relaxing"/"play jazz"
+  naturally searches streaming playlists first, same as a human would.
   `radio_mode=true` starts a continuous radio mix seeded from the match instead of
-  playing it once.
+  playing it once. If the top match turns out unplayable (e.g. an empty playlist), it
+  automatically tries the next candidate before giving up.
+- **`play_random`** — build and play a random mix straight from the library, no search
+  query needed - for "play something"/"surprise me"/"random mix from my local files"
+  requests. Same `scope`/`source` params as `play` (default `scope="all"` here, since
+  there's no query to search "online" against - the point is usually to surface your
+  own library).
 - **`control`** — play/pause/stop/toggle/next/previous/seek.
 - **`volume`** — level / relative adjust / mute, optionally group-wide.
 - **`queue`** — get/shuffle/repeat/clear/move/remove, keyed off one player.
@@ -258,6 +267,42 @@ Left as hard errors (genuinely ambiguous, no safe default exists): `volume` give
 than one of `level`/`adjust`/`mute` at once; `queue`'s `move_up`/`move_down`/
 `move_next`/`remove` without `item_id` (no safe guess for *which* item); `group`'s
 `action` if it's neither `join` nor `leave` (opposite operations, shouldn't guess).
+
+### Human-request simulation (default scope + quality fixes)
+
+Simulated realistic requests live against the real server - mood/occasion queries
+("relaxing", "romantic evening", "dinner vibe", "jazz"), specific artist/track/album
+lookups, explicit `source`/`scope`, and a query-less "surprise me" - to check how the
+tools actually behave for a human, not just whether they run without erroring. Found
+and fixed:
+
+- **Default scope was "all" (online + local mixed together)**, which doesn't match how
+  a human expects "play something"/"play `<artist>`" to behave (reach for a streaming
+  service first). Changed the default to **"online"**, automatically broadening to
+  everything (`scope="all"` semantics) if nothing turns up there - so a local-only match
+  still gets found without asking for it by name, but a home NAS full of oddly-named
+  files doesn't get preferred over Spotify/Tidal by default. Explicit `scope="all"` /
+  `"local"` / `"online"` is still respected exactly, no fallback applied.
+- **A nonsense query could still "confidently" play something unrelated** - e.g.
+  searching the literal gibberish `"asdkfjhqwoeiuasdf"` as an artist returned an
+  unrelated real artist, because the Tidal/Spotify/Apple priority tiebreak among
+  *equally unmatched* candidates always picks one of them. `pick_best()` now returns no
+  match at all (not just "wrong match") for artist/track/album lookups where nothing
+  genuinely matched the query by name, so `play()` correctly reports "no results" instead
+  of playing something wrong.
+- **An empty/blank `query` returned garbage** (a local playlist's raw file listing, not
+  a real search result) instead of failing clearly. `play`/`search` now reject an
+  empty query outright, and `play`'s error message points at `play_random` for the
+  query-less "surprise me" case.
+- **A matched item could still be genuinely unplayable** (confirmed live: a same-named
+  local "Jazz" playlist that turned out to be empty) - `player_queues/play_media`
+  raising `MediaNotFoundError`/`UnplayableMediaError` used to fail the whole call.
+  `play()` now automatically tries the next candidate (up to 3) before giving up, and
+  reports which ones got skipped in a `note`.
+- **New `play_random` tool**, backed by `music/tracks/library_items` with
+  `order_by="random"` (a real server-side capability, confirmed - not client-side
+  shuffling of a search result) - lets "play something from my local library"/"surprise
+  me" build an ad-hoc mix without needing any search query at all.
 
 ### Still unverified
 - `transfer` (`player_queues/transfer`) wasn't exercised in the live scenarios above.
