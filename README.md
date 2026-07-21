@@ -37,9 +37,13 @@ is baked into the tools themselves:
   requests. Same `scope`/`source` params as `play` (default `scope="all"` here, since
   there's no query to search "online" against - the point is usually to surface your
   own library).
-- **`control`** — play/pause/stop/toggle/next/previous/seek.
+- **`control`** — play/pause/stop/toggle/next/previous/seek, plus a read-only
+  `status`/`get`/`now_playing` query for "what's playing?" (never sends a playback
+  command).
 - **`volume`** — level / relative adjust / mute, optionally group-wide.
-- **`queue`** — get/shuffle/repeat/clear/move/remove, keyed off one player.
+- **`queue`** — get/shuffle/repeat/clear/move/remove, keyed off one player. `get`
+  returns a slimmed-down summary (current/next track, upcoming list), not MA's raw
+  queue-item payload.
 - **`transfer`** — move playback from one player to another.
 - **`browse`** — walk a provider's library hierarchy.
 - **`group`** — join/leave player groups (e.g. syncing a LedFX visualizer).
@@ -325,7 +329,11 @@ request" - audited every tool for this and fixed the gaps:
   remains; `option` falls back to `"play"` if not one of the four valid values.
 - `control`: `command` is case-insensitive and accepts a few synonyms (`resume`, `skip`,
   `prev`, ...); anything still unrecognized falls back to `"play"` (with a `note`)
-  instead of raising. `seek_seconds` is clamped to ≥ 0.
+  instead of raising. `seek_seconds` is clamped to ≥ 0. `get`/`status`/`now_playing`/
+  `info`/`state`/`current` are recognized as read-only status queries and short-circuit
+  before that fallback - important because a local model asked "what's playing?" will
+  reach for `control(command="get")` on its own, and without this it used to silently
+  default to `"play"` (i.e. resume/restart playback in response to a question).
 - `volume`: calling with none of `level`/`adjust`/`mute` set now just reports the
   current level instead of erroring; `level` is clamped to 0-100; `adjust` is
   case-insensitive and accepts synonyms (`louder`, `quieter`, ...); `group=true` with
@@ -340,6 +348,18 @@ Left as hard errors (genuinely ambiguous, no safe default exists): `volume` give
 than one of `level`/`adjust`/`mute` at once; `queue`'s `move_up`/`move_down`/
 `move_next`/`remove` without `item_id` (no safe guess for *which* item); `group`'s
 `action` if it's neither `join` nor `leave` (opposite operations, shouldn't guess).
+
+### Slim now-playing/queue status
+
+Found live: MA's raw `player_queues/all` + `player_queues/items` response nests the
+full media item for every track - images, DSP filter chains, every provider mapping,
+external IDs, streamdetails, etc. For a queue with a few thousand items, even fetching
+just the current + a handful of upcoming items produced a response tens of thousands of
+characters long, which a small local model can't usefully consume (and burns context/
+tokens for any model). `queue(action="get")` and `control`'s new status commands now
+return a projected summary instead - `state`, `shuffle`, `repeat`, `queue_length`,
+`current`/`next` (name/artist/album/duration only), and up to 10 `upcoming` tracks in
+the same slim shape.
 
 ### Human-request simulation (default scope + quality fixes)
 

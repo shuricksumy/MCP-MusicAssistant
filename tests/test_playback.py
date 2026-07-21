@@ -82,6 +82,32 @@ async def test_control_unrecognized_falls_back_to_play_with_note(patched_client)
     assert command == "player_queues/play"
 
 
+async def test_control_get_returns_status_without_sending_playback_command(patched_client):
+    client = patched_client(
+        **{
+            "player_queues/all": [{"queue_id": "up1", "state": "paused", "shuffle_enabled": False}],
+            "player_queues/items": [],
+        }
+    )
+    result = await control(player="Living Room", command="get")
+    assert result["command"] == "status"
+    assert result["queue"]["state"] == "paused"
+    assert all(c[0] != "player_queues/play" for c in client.calls)
+
+
+async def test_control_status_synonyms_all_return_status(patched_client):
+    client = patched_client(
+        **{
+            "player_queues/all": [{"queue_id": "up1", "state": "playing"}],
+            "player_queues/items": [],
+        }
+    )
+    for synonym in ("status", "now_playing", "info", "state", "current"):
+        result = await control(player="Living Room", command=synonym)
+        assert result["command"] == "status"
+    assert all(c[0] != "player_queues/play" for c in client.calls)
+
+
 async def test_control_seek_clamps_negative_to_zero(patched_client):
     client = patched_client()
     await control(player="Living Room", seek_seconds=-30)

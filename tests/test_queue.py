@@ -24,15 +24,50 @@ async def test_queue_get_fetches_state_and_items(patched_client):
     patched_client(
         **{
             "player_queues/all": [
-                {"queue_id": "up1", "shuffle_enabled": False},
+                {"queue_id": "up1", "shuffle_enabled": False, "state": "playing"},
                 {"queue_id": "up2", "shuffle_enabled": True},
             ],
-            "player_queues/items": [{"name": "Track 1"}],
+            "player_queues/items": [{"name": "Track 1", "media_item": {"name": "Track 1"}}],
         }
     )
     result = await queue(player="Living Room", action="get")
-    assert result["queue"] == {"queue_id": "up1", "shuffle_enabled": False}
-    assert result["items"] == [{"name": "Track 1"}]
+    assert result["queue"]["state"] == "playing"
+    assert result["queue"]["shuffle"] is False
+    assert result["queue"]["upcoming"] == [{"name": "Track 1", "artist": None, "album": None, "duration": None}]
+
+
+async def test_queue_get_summarizes_current_and_next_track(patched_client):
+    patched_client(
+        **{
+            "player_queues/all": [
+                {
+                    "queue_id": "up1",
+                    "state": "playing",
+                    "current_item": {
+                        "name": "Sirens",
+                        "duration": 161,
+                        "media_item": {
+                            "name": "Sirens",
+                            "artists": [{"name": "Skepta"}, {"name": "Finessekid"}],
+                            "album": {"name": "Sirens (From Ireland)"},
+                            "images": [{"path": "https://example.com/big-image.jpg"}],
+                        },
+                    },
+                    "next_item": {"name": "Take U A Army", "media_item": {"name": "Take U A Army"}},
+                }
+            ],
+            "player_queues/items": [],
+        }
+    )
+    result = await queue(player="Living Room", action="get")
+    assert result["queue"]["current"] == {
+        "name": "Sirens",
+        "artist": "Skepta, Finessekid",
+        "album": "Sirens (From Ireland)",
+        "duration": 161,
+    }
+    assert result["queue"]["next"]["name"] == "Take U A Army"
+    assert "images" not in str(result)
 
 
 async def test_queue_shuffle_defaults_to_true_when_omitted(patched_client):
@@ -85,7 +120,7 @@ async def test_queue_unknown_action_falls_back_to_get(patched_client):
         }
     )
     result = await queue(player="Living Room", action="teleport")
-    assert result["queue"] == {"queue_id": "up1", "shuffle_enabled": False}
+    assert result["queue"]["shuffle"] is False
     assert "note" in result
 
 

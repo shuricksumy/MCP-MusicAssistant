@@ -8,6 +8,58 @@ from ..players import resolve_player
 _MOVE_SHIFT = {"move_up": -1, "move_down": 1, "move_next": 0}
 _VALID_REPEAT = {"off", "one", "all"}
 _KNOWN_ACTIONS = {"get", "shuffle", "repeat", "clear", "remove", *_MOVE_SHIFT}
+_STATUS_ITEMS_LIMIT = 10
+
+
+def _artist_names(media_item: dict | None) -> str | None:
+    if not media_item:
+        return None
+    names = [a.get("name") for a in media_item.get("artists") or [] if a.get("name")]
+    return ", ".join(names) or None
+
+
+def _summarize_track(item: dict | None) -> dict | None:
+    """Collapse a raw queue item (which carries full provider metadata, DSP filters,
+    images, etc.) down to what an agent actually needs to describe what's playing -
+    this raw payload is large enough to blow a small local model's context on its own.
+    """
+    if not item:
+        return None
+    media_item = item.get("media_item") or {}
+    return {
+        "name": item.get("name") or media_item.get("name"),
+        "artist": _artist_names(media_item),
+        "album": (media_item.get("album") or {}).get("name"),
+        "duration": item.get("duration"),
+    }
+
+
+def _summarize_queue(queue_state: dict | None, items: list[dict] | None) -> dict:
+    if not queue_state:
+        return {"active": False}
+    summary = {
+        "state": queue_state.get("state"),
+        "active": queue_state.get("active"),
+        "shuffle": queue_state.get("shuffle_enabled"),
+        "repeat": queue_state.get("repeat_mode"),
+        "queue_length": queue_state.get("items"),
+        "elapsed_seconds": queue_state.get("elapsed_time"),
+        "current": _summarize_track(queue_state.get("current_item")),
+        "next": _summarize_track(queue_state.get("next_item")),
+    }
+    if items:
+        summary["upcoming"] = [_summarize_track(item) for item in items[:_STATUS_ITEMS_LIMIT]]
+    return summary
+
+
+async def fetch_queue_status(client, queue_id: str) -> dict:
+    """Shared by queue(action="get") and control(command="status"/"get") - both need
+    the same slimmed-down now-playing view.
+    """
+    all_queues = await client.send("player_queues/all")
+    queue_state = next((q for q in all_queues or [] if q.get("queue_id") == queue_id), None)
+    items = await client.send("player_queues/items", queue_id=queue_id, limit=50)
+    return _summarize_queue(queue_state, items)
 
 
 async def queue(
@@ -38,10 +90,7 @@ async def queue(
 
     if normalized_action == "get" or normalized_action not in _KNOWN_ACTIONS:
         # there is no "player_queues/get" WS command - fetch all queues and pick ours.
-        all_queues = await client.send("player_queues/all")
-        queue_state = next((q for q in all_queues or [] if q.get("queue_id") == queue_id), None)
-        items = await client.send("player_queues/items", queue_id=queue_id, limit=50)
-        result = {"player": resolved_player.name, "queue": queue_state, "items": items}
+        result = {"player": resolved_player.name, "queue": await fetch_queue_status(client, queue_id)}
         if normalized_action not in _KNOWN_ACTIONS:
             result["note"] = f"unrecognized action '{action}', returned queue state instead"
         return result

@@ -5,6 +5,7 @@ from .. import providers as providers_logic
 from ..ma_client import get_client
 from ..players import resolve_player
 from ..search import normalize_media_types, search_and_pick
+from .queue import fetch_queue_status
 
 # A matched search result can still turn out unplayable server-side (e.g. an empty
 # user-created playlist, or a moved/deleted local file) - confirmed live with a
@@ -34,6 +35,10 @@ _COMMAND_ALIASES = {
     "pause_play": "toggle",
     "play_pause": "toggle",
 }
+# Read-only queries an agent naturally reaches for on "what's playing?"-type asks.
+# These must never fall through to the "unrecognized -> play" default below, since that
+# would resume/restart playback in response to a question that wasn't asking for that.
+_STATUS_COMMANDS = {"get", "status", "now_playing", "nowplaying", "info", "state", "current"}
 
 _VALID_OPTIONS = {"play", "replace", "next", "add"}
 
@@ -215,7 +220,9 @@ async def control(
 
     command: "play" | "pause" | "stop" | "toggle" | "next" | "previous" (a few common
         synonyms like "resume"/"skip"/"prev" are also accepted); unrecognized values
-        fall back to "play" rather than failing.
+        fall back to "play" rather than failing. For "what's playing?"-style questions,
+        use "get" | "status" | "now_playing" | "info" | "state" | "current" - these
+        return the current track/queue status and never trigger playback.
     seek_seconds: if given, seeks to that position instead (convert mm:ss to seconds).
     """
     client = await get_client()
@@ -228,6 +235,10 @@ async def control(
         return {"player": resolved_player.name, "command": "seek", "seek_seconds": seek_seconds}
 
     requested = (command or "play").strip().lower()
+    if requested in _STATUS_COMMANDS:
+        status = await fetch_queue_status(client, resolved_player.player_id)
+        return {"player": resolved_player.name, "command": "status", "queue": status}
+
     normalized = _COMMAND_ALIASES.get(requested, requested)
     ws_command = _TRANSPORT_COMMANDS.get(normalized)
 
