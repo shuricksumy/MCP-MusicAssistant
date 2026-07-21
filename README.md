@@ -77,6 +77,53 @@ Replace `<MCP_HOST>:<MCP_PORT>` with wherever you're running this server (e.g.
 no `command`/`args`/`env` block like the old stdio config - the server must already be
 running (`uv run music-assistant-mcp`) for the client to connect to.
 
+### Running in Docker
+
+```bash
+docker build -t music-assistant-mcp .
+docker run -d --name music-assistant-mcp -p 8005:8005 \
+  -e MA_SERVER_URL=http://192.168.1.50:8095 \
+  -e MA_TOKEN=<your-ma-token> \
+  -e MCP_BEARER_TOKEN=<your-mcp-bearer-token> \
+  music-assistant-mcp
+```
+
+Built and run-tested (`docker build` + `docker run` + a bearer-authed MCP `initialize`
+call) as part of this repo's verification.
+
+### Using mcp-proxy (for hosts that only support stdio-launched servers)
+
+Some MCP hosts only support the `command`/`args`/`env`, stdio-launch style of config
+(like the old community server's `uvx --from git+...` entry) and can't point at a
+remote HTTP URL directly. For those, use [`mcp-proxy`](https://github.com/sparfenyuk/mcp-proxy)
+as a local stdio↔HTTP bridge in front of this server running in its container:
+
+```json
+{
+  "mcpServers": {
+    "music-assistant": {
+      "enabled": true,
+      "timeout": 60,
+      "command": "uvx",
+      "args": [
+        "mcp-proxy",
+        "--transport",
+        "streamablehttp",
+        "--headers",
+        "Authorization",
+        "Bearer <MCP_BEARER_TOKEN>",
+        "http://<MCP_HOST>:<MCP_PORT>/mcp"
+      ],
+      "transportType": "stdio"
+    }
+  }
+}
+```
+
+The container (or `uv run music-assistant-mcp` on bare metal) still has to be running
+and reachable at `<MCP_HOST>:<MCP_PORT>` - `mcp-proxy` only bridges the host's stdio
+expectation to it, it doesn't start the server itself.
+
 ## Wiring into n8n
 
 Point the existing "Music MCP Client" node's endpoint at this server's `/mcp` URL with
