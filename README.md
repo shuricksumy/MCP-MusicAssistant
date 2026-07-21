@@ -1,5 +1,21 @@
 # Music Assistant MCP
 
+> Talk to your home audio system like a person, not an API.
+
+| You say | What happens |
+|---|---|
+| "Play something relaxing" | Searches streaming playlists, picks the best match, plays it on the default player - no player id, no source picking |
+| "Play some jazz for a romantic dinner" | Mood/occasion query → finds a fitting playlist automatically, same as a human browsing Spotify would |
+| "Play The Prodigy in radio mode" | Resolves the artist, checks the *actual* provider can generate a mix before starting one, so it never silently no-ops |
+| "Play Coldplay from my local files" | Scopes the search to just the local/NAS library, skipping streaming entirely |
+| "Surprise me" | Builds an ad-hoc mix straight from the library - no search query needed at all |
+| "Join the LedFX player while this plays, then take it back out" | Groups/ungroups players on request |
+
+One line of natural language in, the right thing playing out - every scenario above is
+tested against a real Music Assistant server, not just plausible-sounding docs (see
+[Verified against a real server](#verified-against-a-real-server-schema-version-31)
+below for the bugs that were actually found and fixed getting there).
+
 A from-scratch MCP server for [Music Assistant](https://music-assistant.io/), designed
 so an LLM agent needs almost no system prompt to drive it. Unlike raw/low-level MCP
 tool sets, the orchestration an agent would otherwise have to be told to do every turn
