@@ -1,12 +1,14 @@
-name: GHCR package cleanup (dry run)
+name: GHCR package cleanup
 
-# Manual-trigger only, dry-run only, for now. docker-publish.yml pushes a `main` branch-alias tag
-# and a short-sha tag on every push to main (plus `latest` via docker/metadata-action's default
-# flavor, and semver tags on a release tag push) -- the sha tags accumulate forever with nothing
-# to clean them up. Review this run's "would delete" log output in the Actions tab before flipping
-# `dry-run` to `false` and adding a `schedule:` trigger.
+# docker-publish.yml pushes a `main` branch-alias tag and a short-sha tag on every push to main
+# (plus `latest` via docker/metadata-action's default flavor, and semver tags on a release tag
+# push) -- the sha tags accumulate forever with nothing to clean them up. Ran dry-run/manual-only
+# first, reviewed the "would delete" output, then went live here. Still runnable on demand via
+# workflow_dispatch alongside the schedule.
 on:
   workflow_dispatch: {}
+  schedule:
+    - cron: "17 3 * * 0" # Sundays 03:17 UTC
 
 permissions:
   packages: write
@@ -34,5 +36,5 @@ jobs:
           exclude-tags: '^latest$|^[0-9]+\.[0-9]+$|^[0-9]+\.[0-9]+\.[0-9]+$'
           use-regex: true
           delete-untagged: true
-          dry-run: true
+          dry-run: false
           log-level: info
