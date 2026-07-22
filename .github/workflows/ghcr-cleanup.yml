@@ -1,0 +1,33 @@
+name: GHCR package cleanup (dry run)
+
+# Manual-trigger only, dry-run only, for now. docker-publish.yml pushes a `main` branch-alias tag
+# and a short-sha tag on every push to main (plus `latest` via docker/metadata-action's default
+# flavor, and semver tags on a release tag push) -- the sha tags accumulate forever with nothing
+# to clean them up. Review this run's "would delete" log output in the Actions tab before flipping
+# `dry-run` to `false` and adding a `schedule:` trigger.
+on:
+  workflow_dispatch: {}
+
+permissions:
+  packages: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete old ghcr.io package versions
+        uses: dataaxiom/ghcr-cleanup-action@v1.2.2
+        with:
+          owner: shuricksumy
+          # Published as ghcr.io/shuricksumy/music-assistant-mcp -- IMAGE_NAME in
+          # docker-publish.yml is repository_owner-scoped, not the repo name.
+          package: 'music-assistant-mcp'
+          # Keep `latest` and any release tag (1.2.3, 1.2, ...); delete every other tag (i.e. the
+          # `main` branch-alias tag and every short-sha build tag) plus orphaned untagged
+          # multi-arch layers.
+          delete-tags: '.*'
+          exclude-tags: '^latest$|^[0-9]+\.[0-9]+(\.[0-9]+)?$'
+          use-regex: true
+          delete-untagged: true
+          dry-run: true
+          log-level: info
