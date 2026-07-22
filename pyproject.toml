@@ -5,7 +5,7 @@ description = "MCP server for Music Assistant with high-level, LLM-friendly tool
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    "mcp[cli]>=1.2.0",
+    "mcp[cli]>=1.28.1",
     "music-assistant-client>=1.0.0",
     "music-assistant-models>=1.0.0",
     "uvicorn>=0.30.0",
