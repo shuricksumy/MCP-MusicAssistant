@@ -10,6 +10,7 @@ import logging
 
 import uvicorn
 from mcp.server.fastmcp import FastMCP
+from mcp.server.transport_security import TransportSecuritySettings
 
 from .auth import BearerAuthMiddleware
 from .config import settings
@@ -40,7 +41,19 @@ the queue -> `queue`. Move playback to another player -> `transfer`. Group/ungro
 don't just say "done".
 """
 
-mcp = FastMCP("music-assistant", instructions=INSTRUCTIONS)
+mcp = FastMCP(
+    "music-assistant",
+    instructions=INSTRUCTIONS,
+    # The SDK auto-enables its own DNS-rebinding Host-header check whenever the server
+    # is constructed without an explicit host= override, allow-listing only
+    # 127.0.0.1/localhost/::1 - confirmed live that this silently 421s every request
+    # from a real client reaching this server over its LAN IP, which is the whole point
+    # of running it (n8n etc. on the same network, not localhost). Bearer-token auth
+    # (BearerAuthMiddleware, below) is this server's actual security boundary, so the
+    # redundant Host-header check is disabled explicitly rather than left to trigger by
+    # accident.
+    transport_security=TransportSecuritySettings(enable_dns_rebinding_protection=False),
+)
 register_all(mcp)
 
 app = BearerAuthMiddleware(mcp.streamable_http_app())
