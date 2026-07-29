@@ -220,6 +220,8 @@ as a local stdio↔HTTP bridge in front of this server running in its container:
       "timeout": 60,
       "command": "uvx",
       "args": [
+        "--with",
+        "mcp<2",
         "mcp-proxy",
         "--transport",
         "streamablehttp",
@@ -233,6 +235,17 @@ as a local stdio↔HTTP bridge in front of this server running in its container:
   }
 }
 ```
+
+The `--with mcp<2` matters regardless of which branch of *this* server you're
+running: `mcp-proxy` is a separate package (not this repo) whose own `mcp` dependency
+is unbounded (`mcp>=1.17.0`), so a bare `uvx mcp-proxy` resolves the newly-released
+`mcp==2.0.0` and crashes on startup (`ImportError: cannot import name 'request_ctx'
+from 'mcp.server.lowlevel.server'` - confirmed live, `mcp-proxy` 0.12.0 isn't
+compatible with v2's restructured internals yet). Pinned to `mcp<2`, `mcp-proxy`
+works fine as a client against either this repo's `main` (v2) or `v1` branch -
+verified live end-to-end against both: v2 servers still speak the older protocol
+revision `mcp-proxy` negotiates. Drop `--with mcp<2` once `mcp-proxy` ships v2
+support.
 
 The container (or `uv run music-assistant-mcp` on bare metal) still has to be running
 and reachable at `<MCP_HOST>:<MCP_PORT>` - `mcp-proxy` only bridges the host's stdio
