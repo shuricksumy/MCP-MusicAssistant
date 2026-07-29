@@ -131,6 +131,8 @@ stdio pipes directly instead of talking to it over the network:
       "args": [
         "--from",
         "git+https://github.com/shuricksumy/MCP-MusicAssistant",
+        "--with",
+        "mcp<2.0.0",
         "music-assistant-mcp"
       ],
       "env": {
