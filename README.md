@@ -2,6 +2,11 @@
 
 > Talk to your home audio system like a person, not an API.
 
+This branch (`v1`) is pinned to the **mcp v1.x** Python SDK (`mcp[cli]<2`) for hosts/
+clients not yet ready for v2 - functionally identical to
+[`main`](https://github.com/shuricksumy/MCP-MusicAssistant) otherwise (same tools,
+same fixes, same tests), which tracks the newer **mcp v2** SDK going forward.
+
 | You say | What happens |
 |---|---|
 | "Play something relaxing" | Searches streaming playlists, picks the best match, plays it on the default player - no player id, no source picking |
@@ -130,9 +135,7 @@ stdio pipes directly instead of talking to it over the network:
       "command": "uvx",
       "args": [
         "--from",
-        "git+https://github.com/shuricksumy/MCP-MusicAssistant",
-        "--with",
-        "mcp<2.0.0",
+        "git+https://github.com/shuricksumy/MCP-MusicAssistant@v1",
         "music-assistant-mcp"
       ],
       "env": {
