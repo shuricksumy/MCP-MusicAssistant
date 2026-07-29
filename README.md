@@ -66,6 +66,23 @@ uv sync                # or: pip install -e ".[dev]"
 uv run music-assistant-mcp
 ```
 
+### MCP Python SDK version: `main` (v2) vs `v1` branch
+
+The official `mcp` Python SDK released a stable `2.0.0` in July 2026 - a real breaking
+change (`FastMCP` renamed to `MCPServer`, transport wiring moved around, a new
+protocol revision alongside the old one). Upstream now maintains 1.x separately in
+maintenance mode (security fixes only). This repo mirrors that split instead of
+shimming both APIs at runtime:
+
+- **`main`** tracks the `mcp[cli]>=2.0.0,<3` SDK - use this unless you have a specific
+  reason not to.
+- **[`v1`](https://github.com/shuricksumy/MCP-MusicAssistant/tree/v1)** pins
+  `mcp[cli]>=1.28.1,<2` for hosts/clients not yet ready for v2. Functionally identical
+  to `main` otherwise - same tools, same fixes, same tests.
+
+If you're pointing `uvx --from git+...` at a specific ref, add `@v1` (or `@main`) to
+the git URL to pick the branch.
+
 `DEFAULT_PLAYER_NAME` isn't optional in practice - leave it unset and any tool call that
 doesn't explicitly name a player fails with `No default player configured and none
 could be resolved` (confirmed live). Set it to a name from `list_players`' output (e.g.
@@ -131,8 +148,6 @@ stdio pipes directly instead of talking to it over the network:
       "args": [
         "--from",
         "git+https://github.com/shuricksumy/MCP-MusicAssistant",
-        "--with",
-        "mcp<2.0.0",
         "music-assistant-mcp"
       ],
       "env": {

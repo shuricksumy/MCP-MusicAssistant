@@ -1,4 +1,4 @@
-from mcp.server.fastmcp import FastMCP
+from mcp.server import MCPServer as FastMCP
 
 from ..ma_client import get_client
 from ..players import resolve_player

@@ -1,4 +1,4 @@
-from mcp.server.fastmcp import FastMCP
+from mcp.server import MCPServer as FastMCP
 
 from .. import players as players_logic
 from ..ma_client import get_client

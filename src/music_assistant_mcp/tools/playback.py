@@ -1,4 +1,4 @@
-from mcp.server.fastmcp import FastMCP
+from mcp.server import MCPServer as FastMCP
 from music_assistant_models.errors import MediaNotFoundError, UnplayableMediaError
 
 from .. import providers as providers_logic
