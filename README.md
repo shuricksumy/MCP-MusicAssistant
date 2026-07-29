@@ -2,6 +2,11 @@
 
 > Talk to your home audio system like a person, not an API.
 
+This branch (`main`) runs on the **mcp v2** Python SDK. Need the older **mcp v1.x**
+SDK instead? Use the [`v1` branch](https://github.com/shuricksumy/MCP-MusicAssistant/tree/v1) -
+same tools, same fixes, just pinned to `mcp[cli]<2` (see
+[MCP Python SDK version](#mcp-python-sdk-version-main-v2-vs-v1-branch) below for why).
+
 | You say | What happens |
 |---|---|
 | "Play something relaxing" | Searches streaming playlists, picks the best match, plays it on the default player - no player id, no source picking |
