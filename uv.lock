@@ -756,9 +756,9 @@ resolution-markers = [
     "python_full_version < '3.12' and sys_platform != 'win32'",
 ]
 dependencies = [
-    { name = "aiohttp", marker = "python_full_version < '3.12'" },
-    { name = "music-assistant-models", version = "1.1.97", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
-    { name = "orjson", marker = "python_full_version < '3.12'" },
+    { name = "aiohttp" },
+    { name = "music-assistant-models", version = "1.1.97", source = { registry = "https://pypi.org/simple" } },
+    { name = "orjson" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/8c/81/90c2f76db636e9442bf31c40cd6326446c1e1844b6fa0667d57c73282db1/music_assistant_client-1.3.4.tar.gz", hash = "sha256:3aa4d8c2621c3dc555c2194e8c6d861b5cdbbf636d303a28a4cf84c6b206f4ea", size = 32630, upload-time = "2026-02-09T18:33:03.954Z" }
 wheels = [
@@ -776,9 +776,9 @@ resolution-markers = [
     "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform != 'win32'",
 ]
 dependencies = [
-    { name = "aiohttp", marker = "python_full_version >= '3.12'" },
-    { name = "music-assistant-models", version = "1.1.152", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
-    { name = "orjson", marker = "python_full_version >= '3.12'" },
+    { name = "aiohttp" },
+    { name = "music-assistant-models", version = "1.1.152", source = { registry = "https://pypi.org/simple" } },
+    { name = "orjson" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/9e/97/340df307d081f22debe27d3a3c720a79e24af0ef38240bb39fc98947ba36/music_assistant_client-1.4.3.tar.gz", hash = "sha256:ea12094e05a8f5d14a9ac38f28d1195dfc69b14df1a567316dc133436c58aecc", size = 35460, upload-time = "2026-07-12T08:39:45.211Z" }
 wheels = [
@@ -811,7 +811,7 @@ requires-dist = [
     { name = "music-assistant-client", specifier = ">=1.0.0" },
     { name = "music-assistant-models", specifier = ">=1.0.0" },
     { name = "python-dotenv", specifier = ">=1.0.0" },
-    { name = "uvicorn", specifier = ">=0.52.0" },
+    { name = "uvicorn", specifier = ">=0.52.1" },
 ]
 
 [package.metadata.requires-dev]
@@ -829,8 +829,8 @@ resolution-markers = [
     "python_full_version < '3.12' and sys_platform != 'win32'",
 ]
 dependencies = [
-    { name = "mashumaro", marker = "python_full_version < '3.12'" },
-    { name = "orjson", marker = "python_full_version < '3.12'" },
+    { name = "mashumaro" },
+    { name = "orjson" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/ba/8b/a8bc19b195ee14f259e2c90cd8dc27d69093e1f5cf5c3b65826d911dc82f/music_assistant_models-1.1.97.tar.gz", hash = "sha256:b26692eeb1ea36599e83d177bb49a2daeaac0d3a68ec0471f7e322890c28c89e", size = 38829, upload-time = "2026-02-08T18:59:00.415Z" }
 wheels = [
@@ -848,8 +848,8 @@ resolution-markers = [
     "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform != 'win32'",
 ]
 dependencies = [
-    { name = "mashumaro", marker = "python_full_version >= '3.12'" },
-    { name = "orjson", marker = "python_full_version >= '3.12'" },
+    { name = "mashumaro" },
+    { name = "orjson" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/05/a7/a7dd7de2bf810541c3f17b47e2f2aab54f6d203b830f21e37bacc6f255d3/music_assistant_models-1.1.152.tar.gz", hash = "sha256:8d41a05f99102961b3be07a151409d10a1c62cf74330212d9b2fec5c1e2c0568", size = 63395, upload-time = "2026-07-05T21:07:49.886Z" }
 wheels = [
@@ -1515,15 +1515,15 @@ wheels = [
 
 [[package]]
 name = "uvicorn"
-version = "0.52.0"
+version = "0.52.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "click" },
     { name = "h11" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/05/c8/2d307868453a4bca6e64fa3581d122ae0748a0869c53f159339def179c7c/uvicorn-0.52.0.tar.gz", hash = "sha256:ca8876ad6c1983f394157c168b39d52f6dd56dabf5602fa0982751cffc2293ae", size = 97504, upload-time = "2026-07-29T08:45:34.065Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/03/18/ccce41535dee1be77735592bd19965f3972c82e07ee703d324709496b716/uvicorn-0.52.1.tar.gz", hash = "sha256:112ec661814189acbccd3f7b86460147cc065fc92c0821afa78918780e4354dd", size = 100571, upload-time = "2026-08-01T18:19:30.732Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/39/e6/b5c0630ace9757232aec07112be8146b812787db52141ff9d50674aa7634/uvicorn-0.52.0-py3-none-any.whl", hash = "sha256:3d887809810b89ed33501bcf0a9aba469b06ecd608158efce04bd6b48d8c9b08", size = 79058, upload-time = "2026-07-29T08:45:32.492Z" },
+    { url = "https://files.pythonhosted.org/packages/c7/d5/68e6e9bca63c0badf67002890a46d3784c958de45b65e1275ec583ca1f06/uvicorn-0.52.1-py3-none-any.whl", hash = "sha256:e4403f9d93188cf9d1088e9f40e3acd12630e2df8675316704379a7fc20fff6a", size = 79859, upload-time = "2026-08-01T18:19:29.294Z" },
 ]
 
 [[package]]
