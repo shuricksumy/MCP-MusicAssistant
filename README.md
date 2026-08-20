@@ -1,5 +1,7 @@
 # Music Assistant MCP
 
+> **Part of the [Home Audio Stack](https://github.com/shuricksumy/home-audio-stack)** — Music Assistant → Snapcast → PipeWire, into USB DACs, Bluetooth speakers and LED strips. That page maps how these projects fit together.
+
 > Talk to your home audio system like a person, not an API.
 
 This branch (`main`) runs on the **mcp v2** Python SDK. Need the older **mcp v1.x**
