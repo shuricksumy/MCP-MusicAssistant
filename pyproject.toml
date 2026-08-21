@@ -9,7 +9,7 @@ dependencies = [
     "music-assistant-client>=1.0.0",
     "music-assistant-models>=1.0.0",
     "uvicorn>=0.52.1",
-    "python-dotenv>=1.0.0",
+    "python-dotenv>=1.2.3",
 ]
 
 [project.scripts]
