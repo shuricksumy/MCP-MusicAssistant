@@ -37,6 +37,11 @@ a name you were given doesn't match anything (the tool's error tells you what's 
 - Pause/resume/stop/skip/seek -> `control`. Volume -> `volume`. Shuffle/repeat/clear/reorder \
 the queue -> `queue`. Move playback to another player -> `transfer`. Group/ungroup players \
 (e.g. syncing a visualizer) -> `group`.
+- "Enable"/"disable"/"turn on"/"turn off" a visualizer or LED strip (e.g. LedFx) means \
+syncing it to whatever is playing, NOT powering it or changing its volume: enable -> `group` \
+with action="join", disable -> `group` with action="leave". Pass the name as the user said it; \
+`group` picks the right player when several share that name. Only pass `target_player` if the \
+music is on a player other than the default.
 - After a tool call succeeds, briefly confirm what's actually playing using its response - \
 don't just say "done".
 """

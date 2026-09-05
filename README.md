@@ -17,10 +17,11 @@ same tools, same fixes, just pinned to `mcp[cli]<2` (see
 | "Play Coldplay from my local files" | Scopes the search to just the local/NAS library, skipping streaming entirely |
 | "Surprise me" | Builds an ad-hoc mix straight from the library - no search query needed at all |
 | "Join the LedFX player while this plays, then take it back out" | Groups/ungroups players on request |
+| "Enable ledfx" / "turn off the LEDs" | Same thing in on/off words - syncs/unsyncs the visualizer with what's playing, picking the LedFx that shares a protocol with it |
 
 One line of natural language in, the right thing playing out - every scenario above is
 tested against a real Music Assistant server, not just plausible-sounding docs (see
-[Verified against a real server](#verified-against-a-real-server-schema-version-31)
+[Verified against a real server](#verified-against-a-real-server-schema-version-65)
 below for the bugs that were actually found and fixed getting there).
 
 A from-scratch MCP server for [Music Assistant](https://music-assistant.io/), designed
@@ -55,7 +56,12 @@ is baked into the tools themselves:
   queue-item payload.
 - **`transfer`** — move playback from one player to another.
 - **`browse`** — walk a provider's library hierarchy.
-- **`group`** — join/leave player groups (e.g. syncing a LedFX visualizer).
+- **`group`** — join/leave player groups (e.g. syncing a LedFX visualizer). Member
+  names are matched against players on the *same protocol* as the target, since MA
+  only syncs players that share one - so "add LedFx to DX3" picks the squeezelite
+  `LedFx` while a snapcast target picks the snapcast `LedFX`, and a request that
+  genuinely crosses protocols comes back with a warning instead of quietly doing
+  nothing.
 - **`search`** — raw lookup without playing (same `scope`/`source` params as `play`),
   for "what do you have for X" questions.
 - **`list_players`** / **`list_providers`** — diagnostic/fallback only; other tools
@@ -294,6 +300,27 @@ you're running something smaller/local, it's the part actually carrying the weig
 you likely don't need PROMPT.md as a system prompt at all beyond the confirm-before-clear
 policy it adds on top.
 
+### Turning a visualizer on and off
+
+"Enable ledfx" / "turn off the LEDs" is the natural way to ask for this, but there is no
+power or enable operation behind it - the visualizer is a player, and enabling it means
+**grouping it with whatever is playing**:
+
+```
+"enable ledfx"   ->  group(action="join",  players=["ledfx"])
+"disable ledfx"  ->  group(action="leave", players=["ledfx"])
+```
+
+Nothing in the tool names says so, and an agent left to guess will reach for `volume` or
+a power tool that doesn't exist - so that mapping is spelled out in the server's
+`instructions` (and mirrored in PROMPT.md for hosts that ignore them). No per-request
+prompting needed beyond that; the user just says it.
+
+`target_player` can be omitted, in which case the visualizer joins `DEFAULT_PLAYER_NAME`.
+Worth knowing: that is the *configured* default, not whatever is currently playing - so
+if music is running on some other player, the agent has to pass `target_player`
+explicitly, or the join lands on the wrong (and possibly wrong-protocol) target.
+
 ## Development
 
 ```bash
@@ -303,10 +330,14 @@ uv run pytest
 Tests cover the pure logic (player/provider resolution, source/scope tiebreak, queue
 action dispatch) against a fake Music Assistant client.
 
-### Verified against a real server (schema version 31)
+### Verified against a real server (schema version 65)
 
 All four end-to-end scenarios below were run against a live server and fixed until
 green - the bugs found along the way are worth knowing about if you extend this further:
+
+Re-verified against **Music Assistant 2.10.2 (schema 65)**: every WS command this server
+uses still exists and takes the same arguments as it did on schema 31, so no protocol
+update was needed. What did break was player lookup - see the duplicate-name note below.
 
 - **`play(query="Relaxing music", player="Living Room")`** — works.
 - **`play(query="The Prodigy", player="Living Room", media_types=["artist"], radio_mode=True)`**
@@ -323,6 +354,24 @@ green - the bugs found along the way are worth knowing about if you extend this 
 - **`group(action="join", players=["LedFX"], target_player="Living Room")` then
   `group(action="leave", players=["LedFX"])`** — works. Found and fixed:
   `players/cmd/group_many` takes `child_player_ids`, not `player_ids`.
+
+  Found and fixed on the schema-65 re-run: Music Assistant keeps stale players around
+  under the same name as the live one - an offline snapcast `LedFX` sat next to the
+  squeezelite `LedFx` that was actually wired up. `find_player()` matched on name alone
+  and list order handed back the dead twin, and MA *accepts* group/ungroup commands for
+  an unavailable player and then silently does nothing (returns `None`, no error, no
+  state change) - so `group` reported a confident success while LedFx never moved.
+
+  Two things fix it. Name lookup breaks ties towards the player MA reports as
+  `available`, which also makes prefixes like `"DX3"` resolve where they used to give up
+  as ambiguous. And `group` resolves its *target first*, then matches member names only
+  against players that can actually sync with it - MA publishes this per player as
+  `can_group_with` (what its own UI offers), with the provider as a fallback since that
+  list is empty for a player currently acting as a group child. So the same
+  `group(players=["LedFx"])` resolves to the squeezelite player for a squeezelite target
+  and the snapcast one for a snapcast target, and protocol beats availability rather
+  than the other way round. A request that still crosses protocols is carried out but
+  returns an explicit `warning`, because MA's own response to one is silence.
 
 Other bugs found and fixed by cross-checking `music-assistant-client`'s source directly
 (not just live-called): `music/search` groups results under **plural** keys
