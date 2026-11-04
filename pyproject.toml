@@ -24,7 +24,7 @@ packages = ["src/music_assistant_mcp"]
 
 [dependency-groups]
 dev = [
-    "pytest>=8.0.0",
+    "pytest>=9.2.0",
     "pytest-asyncio>=1.4.1",
 ]
 
